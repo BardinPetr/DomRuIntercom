@@ -8,6 +8,7 @@ requests = "==2.26.0"
 face-recognition = "*"
 uplink = "*"
 pydantic = "*"
+opencv-contrib-python = "*"
 
 [dev-packages]
 
