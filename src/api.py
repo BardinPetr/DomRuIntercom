@@ -45,16 +45,16 @@ class BaseAPI(Consumer):
     @returns.json(key='data')
     @get("rest/v1/forpost/cameras/{cam_id}/video?LightStream=0")
     def _get_video_stream(self, cam_id: str):
-        """Get stream for camera"""
+        """Get stream for _camera"""
 
     @get("rest/v1/forpost/cameras/{cam_id}/snapshots")
     def _get_snapshot(self, cam_id: str):
-        """Get snapshot of camera"""
+        """Get snapshot of _camera"""
 
     @returns.json
     @get("rest/v1/forpost/cameras/{cam_id}/video?LightStream=0")
     def _get_stream(self, cam_id: str) -> CamerasResponse:
-        """Get stream for camera"""
+        """Get stream for _camera"""
 
     @json
     @returns.json(key='data', type=StatusResponse)

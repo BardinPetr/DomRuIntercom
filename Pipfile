@@ -9,6 +9,7 @@ face-recognition = "*"
 uplink = "*"
 pydantic = "*"
 opencv-contrib-python = "*"
+python-dotenv = "*"
 
 [dev-packages]
 
