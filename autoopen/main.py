@@ -54,7 +54,7 @@ class IntercomOpener(Thread):
                 self.stop()
 
     def _open_door(self, user):
-        # self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
+        self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
         logging.info(f"Door opened for {user}")
 
     def run(self):

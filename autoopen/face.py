@@ -127,6 +127,6 @@ class FaceProcessor(Thread):
                 if len(fpss) > 5 * self._processes_count:
                     fpss.pop(0)
                 fps = len(fpss) / np.sum(fpss)
-                logging.debug("FPS: %.2f" % fps)
+                # logging.debug("FPS: %.2f" % fps)
 
                 yield self._output_frames[self._prev_id(cw)]
