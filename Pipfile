@@ -10,6 +10,10 @@ uplink = "*"
 pydantic = "*"
 opencv-contrib-python = "*"
 python-dotenv = "*"
+flask = "*"
+imutils = "*"
+werkzeug = "*"
+opencv-python = "==4.5.2.52"
 
 [dev-packages]
 
