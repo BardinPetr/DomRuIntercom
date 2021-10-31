@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Union, Tuple
 
@@ -92,7 +93,7 @@ class IntercomAPI(BaseAPI):
         )
 
         self.set_session(res)
-        self.refresh_token()
+        logging.debug(f"Logged in as {self._cred[0]}")
         return res
 
     def refresh_token(self) -> MyhomeSession:

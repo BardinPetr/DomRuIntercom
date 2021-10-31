@@ -16,6 +16,8 @@ class FaceProcessor(Thread):
         with open(classifier_file, 'rb') as f:
             self._clf: KNeighborsClassifier = pickle.load(f)
 
+        logging.debug("Classifier loaded")
+
         self._on_detect = None
         self.threshold = threshold
         self.debug_draw = debug_draw

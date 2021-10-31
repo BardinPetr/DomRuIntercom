@@ -26,9 +26,6 @@ class StreamReaderThread(Thread):
                     pass
 
             self.frame = frame
-            # if (time() - ts) > 9:
-            # sleep(0.01)
-            # ts = time()
 
     def __enter__(self):
         return self

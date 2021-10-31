@@ -8,18 +8,6 @@ import face_recognition
 from sklearn import neighbors
 from tqdm import tqdm
 
-sys.argv += ["/home/petr/Pictures/faces/", "/home/petr/Pictures/faces/knn.bin"]
-photos_path, output_path = sys.argv[1:3]
-
-clf: neighbors.KNeighborsClassifier = pickle.load(open(output_path, 'rb'))
-
-frame = cv2.imread('/home/petr/Pictures/faces0/Irina-0.png')
-face_locations = face_recognition.face_locations(frame, 1)
-test = face_recognition.face_encodings(frame, face_locations, num_jitters=2, model="large")
-
-res = {name: (dst, loc) for name, dst, loc in
-       zip(clf.predict(test), clf.kneighbors(test, 1)[0].reshape(-1), face_locations) if dst < 0.5}
-
 if len(sys.argv) != 3:
     print('Usage: python3 train_classifier.py root_photos_dir classifier_output_path')
 else:

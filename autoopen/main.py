@@ -1,4 +1,3 @@
-import logging
 from os import getenv
 from threading import Thread
 
@@ -10,9 +9,13 @@ from autoopen.face import FaceProcessor
 from autoopen.motiondetector import MotionDetector
 from autoopen.stream_server import WebVideoStreamServer
 from src.api import IntercomAPI
-from src.models.session import MyhomeSession
 
 load_dotenv()
+
+import logging
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
 
 
 class IntercomOpener(Thread):
@@ -43,7 +46,7 @@ class IntercomOpener(Thread):
             if not self.running:
                 break
 
-            cv.imshow('frame', frame)
+            # cv.imshow('frame', frame)
             # cv.imshow('motion', self._motion.motion_mask)
             srv(frame)
 
@@ -53,7 +56,6 @@ class IntercomOpener(Thread):
     def _open_door(self, user):
         # self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
         logging.info(f"Door opened for {user}")
-        print(user)
 
     def run(self):
         self._fp.set_on_detected(lambda users: self._open_door(users[0]))
@@ -62,9 +64,10 @@ class IntercomOpener(Thread):
         Thread(target=self._output_worker).start()
 
         while self.running:
-            stream = 0
+            # stream = 0
             # stream = "/home/petr/Downloads/Telegram Desktop/test.mp4"
-            # _api.get_video_stream(self.camera_pointer['cid'])
+            stream = api.get_video_stream(self.camera_pointer['cid'])
+            logging.debug(f"Got stream: {stream}")
             with StreamReaderThread(stream) as cap:
                 while self.running and cap.running:
                     frame = cap.frame
@@ -79,19 +82,22 @@ class IntercomOpener(Thread):
                     if motion:
                         self._fp(frame)
 
-        cv.destroyAllWindows()
+        # cv.destroyAllWindows()
 
 
 api = IntercomAPI(getenv('DOMRU_LOGIN'), getenv('DOMRU_PASSWORD'))
-# _api.login()
-api.set_session(MyhomeSession(accessToken=getenv('SESSION_TOKEN'),
-                              refreshToken=getenv('SESSION_REFRESH_TOKEN'),
-                              operatorId=int(getenv('SESSION_OPERATOR'))))
 
-fp = FaceProcessor('/home/petr/Pictures/faces/knn.bin', threshold=0.5, debug_draw=True)
+api.login()
+# api.set_session(MyhomeSession(accessToken=getenv('SESSION_TOKEN'),
+#                               refreshToken=getenv('SESSION_REFRESH_TOKEN'),
+#                               operatorId=int(getenv('SESSION_OPERATOR'))))
+
+fp = FaceProcessor(getenv('KNN_CLASSIFIER', './knn.bin'), threshold=float(getenv('THRESHOLD', 0.5)), debug_draw=True)
 md = MotionDetector()
 
 io = IntercomOpener(api, fp, md, int(getenv('CAMERA_ID')))
+
+logging.debug("Basic init finished")
 
 while True:
     pass
