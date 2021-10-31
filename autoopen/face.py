@@ -1,4 +1,5 @@
-import os
+import logging
+import pickle
 import time
 from multiprocessing import Manager, cpu_count, Process
 from threading import Thread
@@ -6,13 +7,19 @@ from threading import Thread
 import cv2 as cv
 import face_recognition
 import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
 
 
 class FaceProcessor(Thread):
-    def __init__(self, known_face_samples: list[str], threshold=0.5):
+    def __init__(self, classifier_file: str, threshold=0.5, debug_draw=False, detected_timeout=5):
         super().__init__()
-        self.known_face_encodings, self.known_face_names = self.image_to_encoding_and_name(known_face_samples)
+        with open(classifier_file, 'rb') as f:
+            self._clf: KNeighborsClassifier = pickle.load(f)
+
+        self._on_detect = None
         self.threshold = threshold
+        self.debug_draw = debug_draw
+        self.detected_timeout = detected_timeout
 
         self._mp_manager = Manager().Namespace()
         self._mp_manager.frame_id = 0
@@ -20,6 +27,7 @@ class FaceProcessor(Thread):
         self._mp_manager.cur_write_worker_id = 0
         self._mp_manager.frame_delay = 0
         self._mp_manager.running = True
+        self._mp_manager.last_detected = time.time()
 
         self._input_frames = Manager().dict()
         self._output_frames = Manager().dict()
@@ -34,6 +42,9 @@ class FaceProcessor(Thread):
 
     def _prev_id(self, cur):
         return (cur - 1) % self._processes_count
+
+    def set_on_detected(self, cb):
+        self._on_detect = cb
 
     def start(self):
         for i in range(self._processes_count):
@@ -55,13 +66,11 @@ class FaceProcessor(Thread):
                     self._mp_manager.running:
                 time.sleep(0.01)
 
-            time.sleep(self._mp_manager.frame_delay)
-
             frame = self._input_frames[self_id]
 
             self._mp_manager.cur_read_worker_id = self._next_id(self._mp_manager.cur_read_worker_id)
 
-            frame, res = self._recognise(frame)
+            frame = self._recognise(frame)
 
             while self._mp_manager.cur_write_worker_id != self_id:
                 time.sleep(0.01)
@@ -69,28 +78,39 @@ class FaceProcessor(Thread):
             self._output_frames[self_id] = frame[:, :, ::-1]
             self._mp_manager.cur_write_worker_id = self._next_id(self._mp_manager.cur_write_worker_id)
 
-    def _recognise(self, new_frame, debug=True):
-        frame = cv.resize(new_frame[:, :, ::-1], (0, 0), fx=0.5, fy=0.5)
+    def _recognise(self, new_frame):
+        frame = cv.resize(new_frame[:, :, ::-1], (0, 0), fx=0.75, fy=0.75)
         face_locations = face_recognition.face_locations(frame, 1)
+
+        if len(face_locations) == 0:
+            return frame
+
         face_encodings = face_recognition.face_encodings(frame, face_locations, num_jitters=1, model="large")
 
-        found = []
-        for enc in face_encodings:
-            dists = face_recognition.face_distance(self.known_face_encodings, enc)
-            idx_min = np.argmin(dists)
-            found.append(
-                (self.known_face_names[idx_min], dists[idx_min]) if dists[idx_min] < self.threshold else (None, None)
-            )
+        res = {
+            name: (dst, loc)
+            for name, dst, loc in
+            zip(self._clf.predict(face_encodings),
+                self._clf.kneighbors(face_encodings, 1)[0].reshape(-1),
+                face_locations)
+            if dst < self.threshold
+        }
 
-        if debug:
-            for (top, right, bottom, left), (name, _) in zip(face_locations, found):
-                # if name is None:
-                #     continue
+        if len(res) == 0:
+            return frame
+
+        if self.debug_draw:
+            for name, (dist, (top, right, bottom, left)) in res.items():
                 cv.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                 cv.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv.FILLED)
-                cv.putText(frame, str(name), (left + 6, bottom - 6), cv.FONT_HERSHEY_DUPLEX, 1.0, (255, 255, 255), 1)
+                cv.putText(frame, f"{name}@{dist:.1f}", (left + 6, bottom - 6),
+                           cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
 
-        return frame, {i[0]: i[1] for i in found if i is not None}
+        if time.time() - self._mp_manager.last_detected > self.detected_timeout:
+            self._on_detect(list(res.keys()))
+            self._mp_manager.last_detected = time.time()
+
+        return frame
 
     def take_frames(self):
         fpss = []
@@ -105,16 +125,6 @@ class FaceProcessor(Thread):
                 if len(fpss) > 5 * self._processes_count:
                     fpss.pop(0)
                 fps = len(fpss) / np.sum(fpss)
-                print("fps: %.2f" % fps)
+                logging.debug("FPS: %.2f" % fps)
 
                 yield self._output_frames[self._prev_id(cw)]
-
-    @staticmethod
-    def scan_samples_dir(path: str):
-        return [os.path.join(path, i) for i in os.listdir(path)]
-
-    @staticmethod
-    def image_to_encoding_and_name(image_files: list[str]):
-        """use format for files: 'username-id.ext' """
-        return [face_recognition.face_encodings(face_recognition.load_image_file(i))[0] for i in image_files], \
-               [i.split('/')[-1].split('-')[0] for i in image_files]

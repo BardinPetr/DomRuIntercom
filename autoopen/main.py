@@ -1,5 +1,4 @@
-import multiprocessing
-import time
+import logging
 from os import getenv
 from threading import Thread
 
@@ -9,6 +8,7 @@ from dotenv import load_dotenv
 from autoopen.camera import StreamReaderThread
 from autoopen.face import FaceProcessor
 from autoopen.motiondetector import MotionDetector
+from autoopen.stream_server import WebVideoStreamServer
 from src.api import IntercomAPI
 from src.models.session import MyhomeSession
 
@@ -37,17 +37,26 @@ class IntercomOpener(Thread):
         self._fp.stop()
 
     def _output_worker(self):
+        srv = WebVideoStreamServer(open_browser=False)
+
         for frame in self._fp.take_frames():
             if not self.running:
                 break
 
             cv.imshow('frame', frame)
+            # cv.imshow('motion', self._motion.motion_mask)
+            srv(frame)
 
             if cv.waitKey(1) == 27:
                 self.stop()
 
+    def _open_door(self, user):
+        # self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
+        logging.info(f"Door opened for {user}")
+        print(user)
+
     def run(self):
-        # srv = WebVideoStreamServer()
+        self._fp.set_on_detected(lambda users: self._open_door(users[0]))
         self._fp.start()
 
         Thread(target=self._output_worker).start()
@@ -56,37 +65,19 @@ class IntercomOpener(Thread):
             stream = 0
             # stream = "/home/petr/Downloads/Telegram Desktop/test.mp4"
             # _api.get_video_stream(self.camera_pointer['cid'])
-            last_opn = 0
             with StreamReaderThread(stream) as cap:
                 while self.running and cap.running:
                     frame = cap.frame
                     if frame is None:
                         continue
 
-                    # start_time = time.time()
-
                     motion = True
                     # if self._motion is not None:
                     #     self._motion(frame)
                     #     motion = self._motion.state
 
-                    # print(round((time.time() - start_time) * 1000), "ms")
-
                     if motion:
                         self._fp(frame)
-
-                        # frame, faces = fp(cap.frame, debug=True)
-                        # if len(faces) > 0 and (time.time() - last_opn) > 5:
-                        # print(faces)
-                        # self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
-                        # last_opn = time.time()
-
-                    # print(round((time.time() - start_time) * 1000), "ms")
-
-                    # srv(frame)
-
-                    # gray = cv.cvtColor(cap.frame, cv.COLOR_BGR2GRAY)
-                    # cv.imshow('Frame', gray)
 
         cv.destroyAllWindows()
 
@@ -97,7 +88,7 @@ api.set_session(MyhomeSession(accessToken=getenv('SESSION_TOKEN'),
                               refreshToken=getenv('SESSION_REFRESH_TOKEN'),
                               operatorId=int(getenv('SESSION_OPERATOR'))))
 
-fp = FaceProcessor(known_face_samples=FaceProcessor.scan_samples_dir('/home/petr/Pictures/faces'), threshold=100000)
+fp = FaceProcessor('/home/petr/Pictures/faces/knn.bin', threshold=0.5, debug_draw=True)
 md = MotionDetector()
 
 io = IntercomOpener(api, fp, md, int(getenv('CAMERA_ID')))

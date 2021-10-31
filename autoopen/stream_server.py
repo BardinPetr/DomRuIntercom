@@ -8,7 +8,7 @@ from werkzeug.serving import make_server
 
 
 class WebVideoStreamServer(Thread):
-    def __init__(self, port=8998):
+    def __init__(self, port=8998, open_browser=False):
         super().__init__(name='web-stream-thread')
         self.lock = Lock()
         self.running = True
@@ -24,10 +24,11 @@ class WebVideoStreamServer(Thread):
 
         self.start()
 
-        try:
-            webbrowser.open_new_tab(f'http://0.0.0.0:{port}')
-        except:
-            pass
+        if open_browser:
+            try:
+                webbrowser.open_new_tab(f'http://0.0.0.0:{port}')
+            except:
+                pass
 
     def run(self):
         self.server.serve_forever()

@@ -5,7 +5,7 @@ from autoopen.debounce import Debounce
 
 
 class MotionDetector:
-    def __init__(self, motion_size_thresh: float = 0.01, motion_active_time=5, motion_debounce_time=1):
+    def __init__(self, motion_size_thresh: float = 0.05, motion_active_time=5, motion_debounce_time=1):
         self._background_sub = cv.createBackgroundSubtractorMOG2()
 
         self._debounce = Debounce(motion_debounce_time)
@@ -19,17 +19,23 @@ class MotionDetector:
         self.motion_size_thresh = motion_size_thresh
         self.motion_active_time = motion_active_time
 
+        self._skip = True
+
     @property
     def state(self):
         return self._debounce.value
 
     def __call__(self, frame):
+        self._skip = not self._skip
+        if self._skip:
+            return
+
         mask = self._background_sub.apply(frame)
         mask = cv.GaussianBlur(mask, (19, 19), 0)
         mask = cv.dilate(mask, None, iterations=1)
-        cv.threshold(mask, 150, 255, cv.THRESH_BINARY, dst=self.motion_mask)
+        self.motion_mask = cv.threshold(mask, 150, 255, cv.THRESH_BINARY)[1]
 
         self.motion_size = np.sum(mask) / (255 * mask.shape[0] * mask.shape[1])
-
+        print(self.motion_size)
         self.realtime_motion = self.motion_size > self.motion_size_thresh
         self._debounce.update(self.realtime_motion)
