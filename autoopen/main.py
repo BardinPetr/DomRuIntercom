@@ -41,14 +41,16 @@ class IntercomOpener(Thread):
 
     def _output_worker(self):
         srv = WebVideoStreamServer(open_browser=False)
+        v_mode = int(getenv('VISUAL', 0))
 
         for frame in self._fp.take_frames():
             if not self.running:
                 break
 
-            # cv.imshow('frame', frame)
-            # cv.imshow('motion', self._motion.motion_mask)
-            srv(frame)
+            if v_mode == 1:
+                cv.imshow('frame', frame)
+            elif v_mode == 2:
+                srv(frame)
 
             if cv.waitKey(1) == 27:
                 self.stop()
@@ -92,7 +94,10 @@ api.login()
 #                               refreshToken=getenv('SESSION_REFRESH_TOKEN'),
 #                               operatorId=int(getenv('SESSION_OPERATOR'))))
 
-fp = FaceProcessor(getenv('KNN_CLASSIFIER', './knn.bin'), threshold=float(getenv('THRESHOLD', 0.5)), debug_draw=True)
+fp = FaceProcessor(getenv('KNN_CLASSIFIER', './knn.bin'),
+                   threshold=float(getenv('THRESHOLD', 0.5)),
+                   proc_cnt=int(getenv('PROCESSES_CNT', -1)),
+                   debug_draw=True)
 md = MotionDetector()
 
 io = IntercomOpener(api, fp, md, int(getenv('CAMERA_ID')))

@@ -8,14 +8,14 @@ requests = "==2.26.0"
 face-recognition = "*"
 uplink = "*"
 pydantic = "*"
-opencv-contrib-python = "*"
 python-dotenv = "*"
 flask = "*"
 imutils = "*"
 werkzeug = "*"
-opencv-python = "==4.5.2.52"
+opencv-python = "==4.5.2.54"
 joblib = "*"
 tqdm = "*"
+scikit-learn = "*"
 
 [dev-packages]
 

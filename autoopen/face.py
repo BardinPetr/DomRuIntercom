@@ -11,13 +11,15 @@ from sklearn.neighbors import KNeighborsClassifier
 
 
 class FaceProcessor(Thread):
-    def __init__(self, classifier_file: str, threshold=0.5, debug_draw=False, detected_timeout=5):
+    def __init__(self, classifier_file: str, threshold=0.5, proc_cnt=-1, debug_draw=False, detected_timeout=5):
         super().__init__()
+
         with open(classifier_file, 'rb') as f:
             self._clf: KNeighborsClassifier = pickle.load(f)
 
         logging.debug("Classifier loaded")
 
+        self._last_frame = None
         self._on_detect = None
         self.threshold = threshold
         self.debug_draw = debug_draw
@@ -34,8 +36,11 @@ class FaceProcessor(Thread):
         self._input_frames = Manager().dict()
         self._output_frames = Manager().dict()
 
+        # proc_cnt == -1 -> auto; proc_cnt == 0 -> don't use mp
+
         self._processes = []
-        self._processes_count = cpu_count()
+        self._processes_count = 0 if proc_cnt == 0 or cpu_count() < 2 else (
+            cpu_count() - 1 if proc_cnt == -1 else proc_cnt)
 
         self.last_took_id = 0
 
@@ -57,6 +62,10 @@ class FaceProcessor(Thread):
         self._mp_manager.running = False
 
     def __call__(self, frame):
+        if self._processes_count == 0:
+            self._last_frame = self._recognise(frame)
+            return
+
         if self._mp_manager.frame_id != self._next_id(self._mp_manager.cur_read_worker_id):
             self._input_frames[self._mp_manager.frame_id] = frame
             self._mp_manager.frame_id = self._next_id(self._mp_manager.frame_id)
@@ -118,6 +127,12 @@ class FaceProcessor(Thread):
         fpss = []
         last_time = time.time()
         while self._mp_manager.running:
+            if self._processes_count == 0:
+                if self._last_frame is not None:
+                    yield self._last_frame
+                    self._last_frame = None
+                continue
+
             cw = self._mp_manager.cur_write_worker_id
             if self.last_took_id != cw:
                 self.last_took_id = cw
