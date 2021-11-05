@@ -10,16 +10,13 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 
 
-class FaceProcessor(Thread):
+class FaceProcessor:
     def __init__(self, classifier_file: str, threshold=0.5, proc_cnt=-1, debug_draw=False, detected_timeout=5):
-        super().__init__()
-
         with open(classifier_file, 'rb') as f:
             self._clf: KNeighborsClassifier = pickle.load(f)
 
         logging.debug("Classifier loaded")
 
-        self._last_frame = None
         self._on_detect = None
         self.threshold = threshold
         self.debug_draw = debug_draw
@@ -44,6 +41,10 @@ class FaceProcessor(Thread):
 
         self.last_took_id = 0
 
+    @property
+    def processes_count(self):
+        return self._processes_count
+
     def _next_id(self, cur):
         return (cur + 1) % self._processes_count
 
@@ -63,12 +64,13 @@ class FaceProcessor(Thread):
 
     def __call__(self, frame):
         if self._processes_count == 0:
-            self._last_frame = self._recognise(frame)
-            return
+            return self._recognise(frame)
 
         if self._mp_manager.frame_id != self._next_id(self._mp_manager.cur_read_worker_id):
             self._input_frames[self._mp_manager.frame_id] = frame
             self._mp_manager.frame_id = self._next_id(self._mp_manager.frame_id)
+
+        return None
 
     def _worker(self, self_id):
         while self._mp_manager.running:
@@ -127,12 +129,6 @@ class FaceProcessor(Thread):
         fpss = []
         last_time = time.time()
         while self._mp_manager.running:
-            if self._processes_count == 0:
-                if self._last_frame is not None:
-                    yield self._last_frame
-                    self._last_frame = None
-                continue
-
             cw = self._mp_manager.cur_write_worker_id
             if self.last_took_id != cw:
                 self.last_took_id = cw

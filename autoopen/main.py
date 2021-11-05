@@ -18,42 +18,43 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 
-class IntercomOpener(Thread):
+class IntercomOpener:
     def __init__(self,
                  api: IntercomAPI,
                  face_processor: FaceProcessor,
                  motion_detector: MotionDetector,
-                 access_control_id: int):
-        super().__init__(name=f'intercom-opener-{api.get_login()}')
+                 access_control_id: int,
+                 video_mode=0):
         self._api = api
         self._fp = face_processor
         self._motion = motion_detector
+        self._video_mode = video_mode
 
         pid, cid = api.find_by_access_control(access_control_id)
         self.camera_pointer = {'pid': pid, 'cid': cid, 'aid': access_control_id}
 
+        if self._video_mode == 2:
+            self._video_srv = WebVideoStreamServer(open_browser=False)
+
         self.running = True
-        self.start()
 
     def stop(self):
         self.running = False
         self._fp.stop()
 
-    def _output_worker(self):
-        srv = WebVideoStreamServer(open_browser=False)
-        v_mode = int(getenv('VISUAL', 0))
+    def _show(self, frame):
+        if self._video_mode == 1:
+            cv.imshow('frame', frame)
+            if cv.waitKey(1) == 27:
+                self.stop()
+        elif self._video_mode == 2:
+            self._video_srv(frame)
 
+    def _output_worker(self):
         for frame in self._fp.take_frames():
             if not self.running:
                 break
-
-            if v_mode == 1:
-                cv.imshow('frame', frame)
-            elif v_mode == 2:
-                srv(frame)
-
-            if cv.waitKey(1) == 27:
-                self.stop()
+            self._show(frame)
 
     def _open_door(self, user):
         self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
@@ -63,13 +64,13 @@ class IntercomOpener(Thread):
         self._fp.set_on_detected(lambda users: self._open_door(users[0]))
         self._fp.start()
 
-        Thread(target=self._output_worker).start()
+        if self._video_mode != 0 and self._fp.processes_count != 0:
+            Thread(target=self._output_worker).start()
 
         while self.running:
-            # stream = 0
-            # stream = "/home/petr/Downloads/Telegram Desktop/test.mp4"
             stream = api.get_video_stream(self.camera_pointer['cid'])
             logging.debug(f"Got stream: {stream}")
+
             with StreamReaderThread(stream) as cap:
                 while self.running and cap.running:
                     frame = cap.frame
@@ -82,9 +83,9 @@ class IntercomOpener(Thread):
                     #     motion = self._motion.state
 
                     if motion:
-                        self._fp(frame)
-
-        # cv.destroyAllWindows()
+                        ret = self._fp(frame)
+                        if ret is not None:
+                            self._show(ret)
 
 
 api = IntercomAPI(getenv('DOMRU_LOGIN'), getenv('DOMRU_PASSWORD'))
@@ -100,9 +101,10 @@ fp = FaceProcessor(getenv('KNN_CLASSIFIER', './knn.bin'),
                    debug_draw=True)
 md = MotionDetector()
 
-io = IntercomOpener(api, fp, md, int(getenv('CAMERA_ID')))
+io = IntercomOpener(api, fp, md,
+                    access_control_id=int(getenv('ACCESS_CONTROL_ID')),
+                    video_mode=int(getenv('VISUAL', 0)))
 
 logging.debug("Basic init finished")
 
-while True:
-    pass
+io.run()

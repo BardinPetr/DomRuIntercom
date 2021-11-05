@@ -36,6 +36,6 @@ class MotionDetector:
         self.motion_mask = cv.threshold(mask, 150, 255, cv.THRESH_BINARY)[1]
 
         self.motion_size = np.sum(mask) / (255 * mask.shape[0] * mask.shape[1])
-        print(self.motion_size)
+
         self.realtime_motion = self.motion_size > self.motion_size_thresh
         self._debounce.update(self.realtime_motion)

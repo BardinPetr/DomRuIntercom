@@ -1,3 +1,4 @@
+import time
 import webbrowser
 from threading import Lock, Thread
 
@@ -50,15 +51,22 @@ class WebVideoStreamServer(Thread):
         with self.lock:
             self.frame = frame
 
+    def _formatted_frame(self):
+        ret, img = cv2.imencode(".jpg", self.frame)
+        if not ret:
+            return None
+        self.frame = None
+        return b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(img) + b'\r\n'
+
     def generate(self):
         while self.running:
             with self.lock:
                 if self.frame is None:
+                    time.sleep(0.01)
                     continue
-                (flag, encodedImage) = cv2.imencode(".jpg", self.frame)
-                if not flag:
-                    continue
-            yield b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n'
+                res = self._formatted_frame()
+                if res is not None:
+                    yield res
 
 
 if __name__ == "__main__":

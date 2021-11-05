@@ -1,5 +1,5 @@
 from threading import Thread
-from time import sleep, time
+import time
 
 import cv2 as cv
 
@@ -15,7 +15,6 @@ class StreamReaderThread(Thread):
         self.start()
 
     def run(self):
-        ts = time()
         while self.running:
             ret, frame = self._camera.read()
             if not ret or frame is None:
@@ -24,7 +23,7 @@ class StreamReaderThread(Thread):
                     self._camera.release()
                 except:
                     pass
-
+            time.sleep(0.005)
             self.frame = frame
 
     def __enter__(self):
