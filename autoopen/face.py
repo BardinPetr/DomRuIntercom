@@ -63,8 +63,8 @@ class FaceProcessor:
         self._mp_manager.running = False
 
     def __call__(self, frame):
-        if self._processes_count == 0:
-            return self._recognise(frame)
+        # if self._processes_count == 0:
+        return self._recognise(frame)
 
         if self._mp_manager.frame_id != self._next_id(self._mp_manager.cur_read_worker_id):
             self._input_frames[self._mp_manager.frame_id] = frame
@@ -120,7 +120,8 @@ class FaceProcessor:
                            cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
 
         if time.time() - self._mp_manager.last_detected > self.detected_timeout:
-            self._on_detect(list(res.keys()))
+            if self._on_detect is not None:
+                self._on_detect(list(res.items()))
             self._mp_manager.last_detected = time.time()
 
         return frame

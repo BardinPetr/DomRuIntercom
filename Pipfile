@@ -16,6 +16,7 @@ opencv-python = "==4.5.2.54"
 joblib = "*"
 tqdm = "*"
 scikit-learn = "*"
+paho-mqtt = "*"
 
 [dev-packages]
 

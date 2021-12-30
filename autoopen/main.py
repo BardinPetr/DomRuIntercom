@@ -6,12 +6,12 @@ from dotenv import load_dotenv
 
 from autoopen.camera import StreamReaderThread
 from autoopen.face import FaceProcessor
+from autoopen.hass import HASSDeviceTrigger
 from autoopen.motiondetector import MotionDetector
 from autoopen.stream_server import WebVideoStreamServer
 from src.api import IntercomAPI
 
 load_dotenv()
-
 import logging
 
 logging.basicConfig()
@@ -25,6 +25,7 @@ class IntercomOpener:
                  motion_detector: MotionDetector,
                  access_control_id: int,
                  video_mode=0):
+        self._cb = None
         self._api = api
         self._fp = face_processor
         self._motion = motion_detector
@@ -37,6 +38,9 @@ class IntercomOpener:
             self._video_srv = WebVideoStreamServer(open_browser=False)
 
         self.running = True
+
+    def set_opened_callback(self, cb):
+        self._cb = cb
 
     def stop(self):
         self.running = False
@@ -56,12 +60,15 @@ class IntercomOpener:
                 break
             self._show(frame)
 
-    def _open_door(self, user):
+    def _open_door(self, users):
+        name, (dist, _) = users[0]
         self._api.open_door(self.camera_pointer['pid'], self.camera_pointer['aid'])
-        logging.info(f"Door opened for {user}")
+        logging.info(f"Door opened for {name} with distance {dist}")
+        if self._cb:
+            self._cb(users[0])
 
     def run(self):
-        self._fp.set_on_detected(lambda users: self._open_door(users[0]))
+        self._fp.set_on_detected(self._open_door)
         self._fp.start()
 
         if self._video_mode != 0 and self._fp.processes_count != 0:
@@ -101,9 +108,16 @@ fp = FaceProcessor(getenv('KNN_CLASSIFIER', './knn.bin'),
                    debug_draw=True)
 md = MotionDetector()
 
+access_control_id = int(getenv('ACCESS_CONTROL_ID'))
 io = IntercomOpener(api, fp, md,
-                    access_control_id=int(getenv('ACCESS_CONTROL_ID')),
+                    access_control_id=access_control_id,
                     video_mode=int(getenv('VISUAL', 0)))
+
+hass = HASSDeviceTrigger(getenv('MQTT_HOST'), int(getenv('MQTT_PORT', 1883)),
+                         getenv('MQTT_USER'), getenv('MQTT_PASS'),
+                         access_control_id)
+
+io.set_opened_callback(hass.opened)
 
 logging.debug("Basic init finished")
 
