@@ -1,18 +1,18 @@
-from typing import List, Any
+from typing import List, Any, Optional
 
 from pydantic import BaseModel
 
 
 class KladrAddress(BaseModel):
-    index: str
-    region: str
-    district: str
-    city: str
-    locality: str
-    street: str
-    house: str
-    building: str
-    apartment: str
+    index: Optional[str]
+    region: Optional[str]
+    district: Optional[str]
+    city: Optional[str]
+    locality: Optional[str]
+    street: Optional[str]
+    house: Optional[str]
+    building: Optional[str]
+    apartment: Optional[str]
 
 
 class Address(BaseModel):
