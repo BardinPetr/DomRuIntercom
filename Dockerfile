@@ -1,27 +1,22 @@
-FROM python:3.9-alpine
+FROM jjanzic/docker-python3-opencv
 
-LABEL maintainer="bardin.petr@gmail.com"
-LABEL version="0.1"
-
-EXPOSE 8998
+LABEL maintainer="Bardin Petr <me@bardinpetr.ru>"
+LABEL version="0.3"
 
 RUN mkdir /app
 WORKDIR /app
 
-RUN apk add wget cmake make g++ gcc
+RUN apt update
+RUN apt install -y libgl1
 
-RUN pip install pipenv
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
 
-ADD Pipfile .
-ADD Pipfile.lock .
+COPY . .
 
-RUN pipenv install --system --deploy --ignore-pipfile
+EXPOSE 8998
 
-RUN git clone https://github.com/davisking/dlib
-RUN cd dlib; python setup.py install
+ENV PYTHONPATH="/app"
+ENV DOCKER="1"
 
-COPY autoopen /app
-
-RUN wget https://file.bardinpa.ru/knn.bin
-
-ENTRYPOINT ["env PYTHONPATH=/app", "python3", "autoopen/main.py"]
+CMD ["python", "/app/autoopen/main.py"]

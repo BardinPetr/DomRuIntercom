@@ -12,7 +12,7 @@ python-dotenv = "*"
 flask = "*"
 imutils = "*"
 werkzeug = "*"
-opencv-python = "==4.5.2.54"
+opencv-python = "*" #"==4.5.2.54"
 joblib = "*"
 tqdm = "*"
 scikit-learn = "*"
@@ -21,4 +21,4 @@ paho-mqtt = "*"
 [dev-packages]
 
 [requires]
-python_version = "3.9"
+python_version = "3.10"

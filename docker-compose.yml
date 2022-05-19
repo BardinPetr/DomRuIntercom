@@ -8,3 +8,5 @@ services:
       - 8998:8998
     env_file:
       - ./.env
+    volumes:
+      - /home/petr/Pictures/faces/knn.bin:/autoopen/knn.bin:r

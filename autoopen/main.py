@@ -1,3 +1,4 @@
+import os
 from os import getenv
 from threading import Thread
 
@@ -10,6 +11,7 @@ from autoopen.hass import HASSDeviceTrigger
 from autoopen.motiondetector import MotionDetector
 from autoopen.stream_server import WebVideoStreamServer
 from src.api import IntercomAPI
+from src.models.session import MyhomeSession
 
 load_dotenv()
 import logging
@@ -97,12 +99,17 @@ class IntercomOpener:
 
 api = IntercomAPI(getenv('DOMRU_LOGIN'), getenv('DOMRU_PASSWORD'))
 
-api.login()
-# api.set_session(MyhomeSession(accessToken=getenv('SESSION_TOKEN'),
-#                               refreshToken=getenv('SESSION_REFRESH_TOKEN'),
-#                               operatorId=int(getenv('SESSION_OPERATOR'))))
+if getenv('SESSION_TOKEN', None) is None:
+    logging.debug("Login required")
+    api.login()
+else:
+    api.set_session(MyhomeSession(accessToken=getenv('SESSION_TOKEN'),
+                                  refreshToken=getenv('SESSION_REFRESH_TOKEN'),
+                                  operatorId=int(getenv('SESSION_OPERATOR'))))
 
-fp = FaceProcessor(getenv('KNN_CLASSIFIER', './knn.bin'),
+is_docker = getenv('DOCKER', None) is not None
+
+fp = FaceProcessor('./knn.bin' if is_docker else getenv('KNN_CLASSIFIER', './knn.bin'),
                    threshold=float(getenv('THRESHOLD', 0.5)),
                    proc_cnt=int(getenv('PROCESSES_CNT', -1)),
                    debug_draw=True)
@@ -113,11 +120,13 @@ io = IntercomOpener(api, fp, md,
                     access_control_id=access_control_id,
                     video_mode=int(getenv('VISUAL', 0)))
 
-hass = HASSDeviceTrigger(getenv('MQTT_HOST'), int(getenv('MQTT_PORT', 1883)),
-                         getenv('MQTT_USER'), getenv('MQTT_PASS'),
-                         access_control_id)
+if getenv('MQTT_HOST', None) is not None:
+    logging.debug("MQTT Enabled")
+    hass = HASSDeviceTrigger(getenv('MQTT_HOST'), int(getenv('MQTT_PORT', 1883)),
+                             getenv('MQTT_USER'), getenv('MQTT_PASS'),
+                             access_control_id)
 
-io.set_opened_callback(hass.opened)
+    io.set_opened_callback(hass.opened)
 
 logging.debug("Basic init finished")
 
